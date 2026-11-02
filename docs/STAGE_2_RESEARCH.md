@@ -14,11 +14,11 @@ Android Keystore will hold a non-exportable P-256 signing key for phone identity
 
 ## Evidence not available here
 
-- No Android SDK/`ANDROID_HOME`, `javac`, ADB, emulator, Android phone, Termux installation, Windows laptop, or Windows shell is available in this sandbox. The Gradle 8.13 wrapper runs, but `testDebugUnitTest` stops before compilation because the SDK is missing.
-- Android source compilation and unit tests are configured in repository CI; those jobs are pending. Local APK compilation and device installation have not been performed.
+- No Android SDK/`ANDROID_HOME`, `javac`, ADB, emulator, Android phone, Termux installation, Windows laptop, or Windows shell is available in this sandbox. The local Gradle 8.13 invocation stops before compilation because the SDK is missing.
+- The hosted GitHub Actions run on commit `280045c` passed Android unit tests and `assembleDebug`, and uploaded a debug APK. No local APK build, emulator run, or physical-device installation has been performed.
 - Android service survival across screen-off, Doze, process death, OEM battery management, reboot, notification denial, and Termux configuration failure is untested.
-- The Windows host code may be exercised by hosted Windows CI; that is not evidence from the specified laptop.
-- No security assessment, 1/6/12/24-hour soak, filesystem-specific crash test, or full power-loss test is claimed.
+- Pairing-host tests passed on a hosted Windows runner; that is not evidence from the specified laptop.
+- A 15-minute Linux host soak passed with 180 checks and zero failures. No security assessment, 1/6/12/24-hour soak, filesystem-specific crash test, or full power-loss test is claimed.
 
 ## References
 

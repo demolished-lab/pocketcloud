@@ -12,7 +12,7 @@ The Stage 1 code is laid out as `runtime/pocketcloud/{api.py,config.py,db.py,mod
 
 Runtime startup refuses UID 0, restricts state to the current user's home, verifies private ownership/modes, and acquires an exclusive per-data-directory lock before migrations/recovery. Job admission and this bounded handler's state transitions are serialized. Configurable admission defaults are a 64 MiB SQLite page/database ceiling and an 8 MiB minimum free-space threshold; database/WAL/SHM preflight rejects new work before persistence when checks fail. No automatic pruning/deletion occurs. Free-space checks are point-in-time, and underlying filesystem types are not reliably detected; use local app-private Termux storage.
 
-Host validation now covers parallel duplicate idempotency, malformed/extra fields, migration tampering/gaps, injected SQLite page corruption, corrupt-header preservation, fixed-verb supervisor start/status/stop, and a bounded 8-second soak smoke test. The soak harness supports longer operator-run durations but no long-duration soak is claimed.
+Host validation now covers parallel duplicate idempotency, malformed/extra fields, migration tampering/gaps, injected SQLite page corruption, corrupt-header preservation, fixed-verb supervisor start/status/stop, state-file symlink rejection, and a bounded 15-minute soak. The soak completed 180 readiness/idempotency cycles with zero failures; this is not a long-duration reliability or Android-device soak. The harness supports longer operator-run durations.
 
 ## Dependency record
 
