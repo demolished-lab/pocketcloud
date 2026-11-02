@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from pocketcloud.config import secure_private_file
 
+_SQLITE_HEADER = b"SQLite format 3\x00"
+
 
 def create_sqlite_engine(database_url: str, max_database_bytes: int | None = None) -> Engine:
     if not database_url.startswith("sqlite:///"):
@@ -37,9 +39,21 @@ def create_sqlite_engine(database_url: str, max_database_bytes: int | None = Non
 def initialize_sqlite_file(engine: Engine, database_path: Path) -> None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
     secure_private_file(database_path)
+    if database_path.stat().st_size > 0:
+        with database_path.open("rb") as database_file:
+            header = database_file.read(len(_SQLITE_HEADER))
+        if header != _SQLITE_HEADER:
+            raise RuntimeError("SQLite database header is invalid; file preserved for recovery")
     with engine.connect() as connection:
         connection.exec_driver_sql("PRAGMA journal_mode=WAL")
         connection.exec_driver_sql("PRAGMA synchronous=FULL")
+
+
+def verify_sqlite_integrity(engine: Engine) -> None:
+    with engine.connect() as connection:
+        rows = connection.exec_driver_sql("PRAGMA quick_check").all()
+    if len(rows) != 1 or str(rows[0][0]).lower() != "ok":
+        raise RuntimeError("SQLite integrity check failed; database files preserved for recovery")
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

@@ -1,0 +1,2 @@
+# Termux/Android-specific input. Every resolved wheel must be checked against the target ABI.
+-r requirements.in

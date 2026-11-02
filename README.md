@@ -1,16 +1,18 @@
 # PocketCloud
 
-PocketCloud is a local-first personal infrastructure platform. Its intended controller is an unrooted Android phone; the first external worker is a Windows 11 laptop. It is designed around durable state, explicit trust, approved handlers, and transparent resource protection—not virtual machines or guaranteed uptime.
+PocketCloud is a local-first personal infrastructure platform. Its intended controller is an unrooted Android phone; the first external worker target is a Windows laptop. It is designed around durable state, explicit trust, approved handlers, and transparent resource protection—not virtual machines or guaranteed uptime. The repository is licensed under [MIT](LICENSE).
 
 ## Current status
 
-The public repository contains the Stage 0 engineering baseline and the first Stage 1 runtime foundation. Stage 1 provides a loopback-only Python API, SQLite/Alembic persistence, health/readiness endpoints, a harmless registered `self_test.v1` handler, idempotency protection, and quarantine for interrupted jobs. It refuses root, restricts state to private user-home storage, protects against duplicate process startup, and enforces configurable SQLite/free-space admission controls. Ten Linux host integration tests pass; see the [Stage 1 test report](docs/TEST_REPORT.md).
+Stage 1 provides a loopback-only Python runtime, SQLite durable jobs, strict request validation, a harmless registered `self_test.v1` handler, idempotency, restart quarantine, private user-home storage, single-process ownership and configurable storage admission. The old Pydantic Core dependency path was removed. A separate Android arm64 CPython 3.12 binary-only wheel resolution passed for all eight runtime lock packages; this is package-index evidence, not a Termux installation or device test. Seventeen Linux sandbox integration tests pass, including concurrent duplicate submissions, injected SQLite corruption and Termux state-path traversal/symlink rejection. An 8-second Linux soak smoke passed; no long soak is claimed.
 
-This is not the full MVP. There is no native Android supervisor, secure pairing, remote/LAN access, Windows worker, GPU detection, dashboard, agent host, backup/restore, or end-to-end phone-to-laptop execution yet. The target Android phone and Windows laptop are not attached, so no Termux or target-device behavior is claimed as verified.
+Stage 2 source now includes the native Android supervisor and same-LAN phone-to-laptop pairing bootstrap. The supervisor is user-started, foreground-visible, and limited to three fixed Termux control verbs; its ongoing notification is removed only after Termux reports a successful stop result. Pairing uses a short-lived one-use QR, TLS public-key pin, Android Keystore identity, and explicit approval on both ends; it exposes no remote shell or job dispatch. Seventeen Linux runtime tests and sixteen Linux pairing-host tests pass. Eight Android JUnit tests and a debug APK build are configured in CI but have not run; hosted Windows CI is pending, and target-device tests remain open.
+
+This is not the full MVP. There is no resource manager, Windows worker, GPU discovery, distributed job dispatch, dashboard, agent host, backup/restore or end-to-end execution. Neither the target Android phone nor Windows laptop is attached; no target hardware behavior is claimed as verified.
 
 ## Run the Stage 1 runtime
 
-Use Python 3.11 or later. From the repository root, install the pinned dependencies and launch the manual loopback service:
+Use Python 3.11 or later. From the repository root, install the host lock and run the manual loopback service:
 
 ```sh
 python3 -m venv .venv
@@ -18,18 +20,23 @@ python3 -m venv .venv
 PYTHON_BIN="$PWD/.venv/bin/python" ./scripts/termux/run.sh
 ```
 
-The service binds only to `127.0.0.1:8765` by default and stores state under `~/.local/share/pocketcloud`. State paths outside the current user's home are refused; use local private storage, not a network/shared filesystem. The service refuses root and permits only one process to own a data directory. Defaults are a 64 MiB SQLite page/database limit and an 8 MiB minimum free-space admission threshold; adjust with `POCKETCLOUD_MAX_DATABASE_BYTES` and `POCKETCLOUD_MIN_FREE_BYTES`. The free-space check is point-in-time. When a limit is reached, new jobs are rejected; existing state is never auto-deleted.
+Termux users should use [`requirements-termux.lock`](requirements-termux.lock), then can run the fixed-verb script with `./scripts/termux/supervisor.sh start|status|stop`. The supervisor is not an uptime guarantee and has not been exercised on an Android phone. See the [Termux guide](scripts/termux/README.md).
 
-`GET /livez` reports process liveness; `GET /readyz` checks database readiness. The only accepted job handler is the harmless `self_test.v1`; no shell command or user-supplied code can execute. On startup, unfinished jobs are marked `needs_reconciliation` rather than replayed blindly.
+The service binds only to `127.0.0.1:8765` by default and stores state under `~/.local/share/pocketcloud`. State paths outside the current user's home are refused; use local private storage, not a network/shared filesystem. The service refuses root and permits only one process per data directory. Defaults are a 64 MiB SQLite database limit and an 8 MiB minimum free-space threshold; adjust with `POCKETCLOUD_MAX_DATABASE_BYTES` and `POCKETCLOUD_MIN_FREE_BYTES`. The free-space check is point-in-time. When a limit is reached, new jobs are rejected; existing state is never auto-deleted.
 
-These instructions have been exercised on the non-root Linux sandbox, not on Termux or an Android device. A public repository does not grant a license; no license has been selected.
+`GET /livez` reports process liveness; `GET /readyz` checks database readiness. Only the harmless `self_test.v1` handler is enabled; no shell command or user-supplied code can execute. On startup, unfinished jobs are marked `needs_reconciliation` rather than replayed blindly.
 
 ## Engineering documents
 
 - [Stage 0 feasibility report](docs/STAGE_0_FEASIBILITY.md)
 - [Stage 1 plan](docs/STAGE_1_PLAN.md)
 - [Build status and evidence](docs/BUILD_STATUS.md)
-- [Test report](docs/TEST_REPORT.md)
+- [Host test report](docs/TEST_REPORT.md)
+- [Stage 2 platform research](docs/STAGE_2_RESEARCH.md)
+- [Pairing protocol v1](docs/PAIRING_PROTOCOL.md)
+- [Android supervisor source and setup](android-supervisor/README.md)
+- [Laptop pairing host and setup](pairing_host/README.md)
+- [Third-party dependency license inventory](THIRD_PARTY_NOTICES.md)
 - [Product requirements](docs/PRD.md)
 - [Software requirements](docs/SRS.md)
 - [Technical requirements and dependency record](docs/TRD.md)
@@ -41,7 +48,7 @@ These instructions have been exercised on the non-root Linux sandbox, not on Ter
 
 ## Non-negotiable boundaries
 
-- No root, bootloader unlock, ROM/system modification, exploits, or hidden persistence.
+- No root, bootloader unlock, ROM/system modification, exploits, boot persistence, or hidden uptime claims.
 - Do not describe PRoot or a managed process as a VM or security boundary.
 - Workers execute registered, approved handlers only; there is no arbitrary remote shell endpoint.
 - Persist authoritative state before acknowledging work. Use at-least-once delivery, idempotency, and reconciliation; never promise universal exactly-once execution.

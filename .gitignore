@@ -16,3 +16,8 @@ __pycache__/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Android/Gradle generated state
+.gradle/
+**/.gradle/
+**/build/

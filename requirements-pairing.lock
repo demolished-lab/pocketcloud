@@ -1,0 +1,6 @@
+# Resolved on Linux x86_64 / CPython 3.12 from requirements-pairing.in.
+# All entries are exact pins; cryptography uses compatible abi3 wheels where available.
+cffi==2.1.1
+cryptography==50.0.2
+pycparser==3.12
+qrcode==8.2

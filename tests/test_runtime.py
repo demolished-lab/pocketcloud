@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -22,6 +23,8 @@ if RUNTIME_PATH not in sys.path:
 
 from pocketcloud.db import create_sqlite_engine
 from pocketcloud.config import load_settings, require_unprivileged
+from pocketcloud.db import initialize_sqlite_file, verify_sqlite_integrity
+from pocketcloud.migrations import apply_migrations
 from pocketcloud.storage import database_bytes
 
 
@@ -174,6 +177,206 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 "SELECT count(*) FROM jobs WHERE idempotency_key LIKE 'parallel:%'"
             ).fetchone()[0]
         self.assertEqual(persisted, created)
+
+    def test_parallel_duplicate_submissions_commit_exactly_one_job(self) -> None:
+        payload = {
+            "handler_id": "self_test.v1",
+            "idempotency_key": "parallel:single-effect",
+            "payload": {"message": "same"},
+        }
+        with ThreadPoolExecutor(max_workers=24) as executor:
+            results = list(executor.map(lambda _index: self._post("/v1/jobs", payload), range(24)))
+        statuses = [status for status, _ in results]
+        self.assertEqual(statuses.count(201), 1)
+        self.assertEqual(statuses.count(200), 23)
+        self.assertEqual(len({body["id"] for _, body in results}), 1)
+        with sqlite3.connect(self.data_dir / "pocketcloud.sqlite3") as connection:
+            count = connection.execute(
+                "SELECT count(*) FROM jobs WHERE idempotency_key='parallel:single-effect'"
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
+
+    def test_malformed_and_non_strict_submissions_are_rejected_without_persistence(self) -> None:
+        invalid = [
+            {"handler_id": "self_test.v1", "idempotency_key": "bad key", "payload": {"message": "x"}},
+            {"handler_id": "self_test.v1", "idempotency_key": "extra", "payload": {"message": "x", "extra": 1}},
+            {"handler_id": "self_test.v1", "idempotency_key": "typed", "payload": {"message": 42}},
+            {"handler_id": "self_test.v1", "idempotency_key": "empty", "payload": {"message": "   "}},
+            {"handler_id": "self_test.v1", "idempotency_key": "root-extra", "payload": {"message": "x"}, "extra": True},
+        ]
+        for submission in invalid:
+            with self.subTest(submission=submission):
+                status, _ = self._post("/v1/jobs", submission)
+                self.assertEqual(status, 422)
+        with sqlite3.connect(self.data_dir / "pocketcloud.sqlite3") as connection:
+            count = connection.execute("SELECT count(*) FROM jobs").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_applied_migration_is_immutable_and_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="pocketcloud-migration-test-", dir=Path.home()) as raw_dir:
+            root = Path(raw_dir)
+            data_dir = root / "data"
+            data_dir.mkdir(mode=0o700)
+            migration_dir = root / "migrations"
+            migration_dir.mkdir(mode=0o700)
+            migration = migration_dir / "0001_initial_jobs.sql"
+            shutil.copyfile(REPOSITORY_ROOT / "runtime/pocketcloud/migrations/0001_initial_jobs.sql", migration)
+            database_path = data_dir / "state.sqlite3"
+            engine = create_sqlite_engine(f"sqlite:///{database_path}", max_database_bytes=1024 * 1024)
+            try:
+                initialize_sqlite_file(engine, database_path)
+                verify_sqlite_integrity(engine)
+                self.assertEqual(apply_migrations(engine, migration_dir), 1)
+                self.assertEqual(apply_migrations(engine, migration_dir), 0)
+                migration.write_text(migration.read_text(encoding="utf-8") + "\n-- altered after apply\n", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "applied migration file changed"):
+                    apply_migrations(engine, migration_dir)
+            finally:
+                engine.dispose()
+
+    def test_quick_check_detects_injected_sqlite_page_corruption(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="pocketcloud-corruption-test-", dir=Path.home()) as raw_dir:
+            database_path = Path(raw_dir) / "corrupt.sqlite3"
+            with sqlite3.connect(database_path) as connection:
+                connection.execute("PRAGMA page_size=4096")
+                connection.execute("CREATE TABLE corruption_probe (payload BLOB NOT NULL)")
+                connection.executemany(
+                    "INSERT INTO corruption_probe(payload) VALUES (?)",
+                    [(bytes([index % 256]) * 3000,) for index in range(512)],
+                )
+            with database_path.open("r+b") as database_file:
+                page_size = int.from_bytes(database_file.read(18)[16:18], "big")
+                self.assertGreater(database_path.stat().st_size, page_size * 2)
+                database_file.seek(page_size)
+                database_file.write(b"\xff")
+            engine = create_sqlite_engine(f"sqlite:///{database_path}")
+            try:
+                with self.assertRaisesRegex(RuntimeError, "integrity check failed"):
+                    verify_sqlite_integrity(engine)
+            finally:
+                engine.dispose()
+
+    def test_termux_supervisor_controls_only_the_local_runtime(self) -> None:
+        self._stop_server()
+        env = os.environ.copy()
+        env["PYTHONPATH"] = RUNTIME_PATH + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+        env["PYTHON_BIN"] = sys.executable
+        env["POCKETCLOUD_DATA_DIR"] = str(self.data_dir)
+        env["POCKETCLOUD_PORT"] = str(self.port)
+
+        start = subprocess.run(
+            ["bash", "scripts/termux/supervisor.sh", "start"],
+            cwd=REPOSITORY_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(start.returncode, 0, start.stderr + start.stdout)
+        self.assertIn("runtime ready", start.stdout)
+
+        status = subprocess.run(
+            ["bash", "scripts/termux/supervisor.sh", "status"],
+            cwd=REPOSITORY_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(status.returncode, 0, status.stderr + status.stdout)
+        self.assertIn("runtime ready", status.stdout)
+
+        forbidden = subprocess.run(
+            ["bash", "scripts/termux/supervisor.sh", "arbitrary-shell"],
+            cwd=REPOSITORY_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertNotEqual(forbidden.returncode, 0)
+        self.assertIn("allowed verbs", forbidden.stderr)
+
+        stop = subprocess.run(
+            ["bash", "scripts/termux/supervisor.sh", "stop"],
+            cwd=REPOSITORY_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(stop.returncode, 0, stop.stderr + stop.stdout)
+        self.assertIn("runtime stopped", stop.stdout)
+
+    def test_termux_supervisor_rejects_symlink_and_traversal_before_mutation(self) -> None:
+        self._stop_server()
+        victim = Path(self.temporary.name) / "symlink-victim"
+        victim.mkdir()
+        victim.chmod(0o755)
+        final_link = Path(self.temporary.name) / "final-link"
+        final_link.symlink_to(victim, target_is_directory=True)
+        parent_link = Path(self.temporary.name) / "parent-link"
+        parent_link.symlink_to(victim, target_is_directory=True)
+
+        def run_with_data_dir(value: str) -> subprocess.CompletedProcess[str]:
+            env = os.environ.copy()
+            env["PYTHON_BIN"] = sys.executable
+            env["POCKETCLOUD_DATA_DIR"] = value
+            return subprocess.run(
+                ["bash", "scripts/termux/supervisor.sh", "status"],
+                cwd=REPOSITORY_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+        for invalid_path in (str(final_link), str(parent_link / "new-state"), str(Path.home() / ".." / "outside")):
+            with self.subTest(path=invalid_path):
+                result = run_with_data_dir(invalid_path)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("no traversal or symlinked components", result.stderr)
+        self.assertEqual(victim.stat().st_mode & 0o777, 0o755)
+        self.assertFalse((victim / "new-state").exists())
+
+        for filename in ("runtime.pid", "runtime.pid.tmp", "runtime.log"):
+            with self.subTest(state_file=filename):
+                label = filename.replace(".", "-")
+                state_dir = Path(self.temporary.name) / f"state-{label}"
+                state_dir.mkdir(mode=0o755)
+                target = victim / f"target-{label}"
+                target.write_text("unchanged", encoding="utf-8")
+                (state_dir / filename).symlink_to(target)
+                result = run_with_data_dir(str(state_dir))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("refusing symlinked runtime state files", result.stderr)
+                self.assertEqual(target.read_text(encoding="utf-8"), "unchanged")
+
+    def test_corrupt_database_header_is_preserved_and_start_fails_closed(self) -> None:
+        self._stop_server()
+        database_path = self.data_dir / "pocketcloud.sqlite3"
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(database_path) + suffix)
+            if sidecar.exists():
+                sidecar.unlink()
+        damaged = b"not a valid sqlite database\n"
+        database_path.write_bytes(damaged)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = RUNTIME_PATH + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+        env["PYTHON_BIN"] = sys.executable
+        env["POCKETCLOUD_DATA_DIR"] = str(self.data_dir)
+        env["POCKETCLOUD_PORT"] = str(self.port)
+        result = subprocess.run(
+            ["bash", "scripts/termux/run.sh"],
+            cwd=REPOSITORY_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SQLite database header is invalid", result.stderr)
+        self.assertEqual(database_path.read_bytes(), damaged)
 
     def test_second_runtime_cannot_quarantine_jobs_while_owner_is_alive(self) -> None:
         status, job = self._post(

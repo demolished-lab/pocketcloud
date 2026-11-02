@@ -1,0 +1,91 @@
+name: PocketCloud CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked runtime
+        run: python -m pip install -r requirements.lock
+      - name: Run runtime tests and static checks
+        run: |
+          PYTHONPATH=runtime python -m unittest discover -s tests -v
+          PYTHONPATH=runtime python -m compileall -q runtime tests scripts/testing/soak_runtime.py
+          python -m pip check
+          bash -n scripts/termux/run.sh scripts/termux/supervisor.sh
+
+  termux-wheel-resolution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Resolve only binary Android arm64 CPython 3.12 wheels
+        run: |
+          python -m pip download \
+            --dest "$RUNNER_TEMP/termux-wheelhouse" \
+            --requirement requirements-termux.lock \
+            --platform android_24_arm64_v8a \
+            --python-version 312 \
+            --implementation cp \
+            --abi cp312 \
+            --only-binary=:all:
+      - name: Print wheel set
+        run: find "$RUNNER_TEMP/termux-wheelhouse" -maxdepth 1 -type f -printf '%f\n' | sort
+
+  android-supervisor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Accept Android SDK licenses and install API 36 SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Run Android unit tests and assemble debug APK
+        working-directory: android-supervisor
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocketcloud-supervisor-debug-apk
+          path: android-supervisor/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  pairing-host-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install laptop pairing-host dependencies
+        run: python -m pip install -r requirements-pairing.lock
+      - name: Run pairing-host tests
+        run: python -m unittest discover -s pairing_host/tests -v
+
+  pairing-host-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install laptop pairing-host dependencies
+        run: python -m pip install -r requirements-pairing.lock
+      - name: Run pairing-host tests
+        run: python -m unittest discover -s pairing_host/tests -v

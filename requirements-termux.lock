@@ -1,0 +1,11 @@
+# Resolved from requirements-termux.in using Android PEP 738 wheel tags:
+# --platform android_24_arm64_v8a --python-version 312 --implementation cp --abi cp312 --only-binary=:all:
+# This is package-index compatibility evidence, not a Termux-device installation test.
+anyio==4.16.0
+click==8.5.0
+h11==0.16.0
+idna==3.20
+SQLAlchemy==2.1.6
+starlette==1.10.0
+typing_extensions==4.16.0
+uvicorn==0.54.0

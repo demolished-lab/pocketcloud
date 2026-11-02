@@ -123,32 +123,6 @@ def create_and_execute_job(
         )
         if is_new:
             _execute_job_serialized(factory, job_id)
-        return job_id, True
-
-
-def create_and_execute_job(
-    factory: sessionmaker[Session],
-    handler_id: str,
-    idempotency_key: str,
-    payload: dict[str, Any],
-    *,
-    database_path: Path,
-    max_database_bytes: int,
-    min_free_bytes: int,
-) -> tuple[str, bool]:
-    """Keep admission, commit, and this bounded handler lifecycle serialized."""
-    with _CREATE_JOB_LOCK:
-        job_id, is_new = create_job(
-            factory,
-            handler_id,
-            idempotency_key,
-            payload,
-            database_path=database_path,
-            max_database_bytes=max_database_bytes,
-            min_free_bytes=min_free_bytes,
-        )
-        if is_new:
-            _execute_job_serialized(factory, job_id)
         return job_id, is_new
 
 

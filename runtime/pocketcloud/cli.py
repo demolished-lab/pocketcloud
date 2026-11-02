@@ -9,16 +9,14 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Iterator
 
-from alembic import command
-from alembic.config import Config
-
 from pocketcloud.config import Settings, load_settings, prepare_data_dir, require_unprivileged, secure_private_file
-from pocketcloud.db import create_sqlite_engine, initialize_sqlite_file, make_session_factory
+from pocketcloud.db import create_sqlite_engine, initialize_sqlite_file, make_session_factory, verify_sqlite_integrity
 from pocketcloud.jobs import reconcile_interrupted_jobs
 from pocketcloud.logging_setup import configure_logging
+from pocketcloud.migrations import apply_migrations
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 
 @contextmanager
@@ -42,25 +40,20 @@ def runtime_lock(settings: Settings) -> Iterator[None]:
             os.close(descriptor)
 
 
-def _alembic_config(database_url: str) -> Config:
-    config = Config(str(REPOSITORY_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(REPOSITORY_ROOT / "runtime" / "pocketcloud" / "migrations"))
-    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-    return config
-
-
 def initialize_runtime(settings: Settings) -> None:
     require_unprivileged()
     prepare_data_dir(settings.data_dir)
     secure_private_file(settings.database_path)
-    os.environ["POCKETCLOUD_DATABASE_URL"] = settings.database_url
-    os.environ["POCKETCLOUD_MAX_DATABASE_BYTES"] = str(settings.max_database_bytes)
-    command.upgrade(_alembic_config(settings.database_url), "head")
     engine = create_sqlite_engine(settings.database_url, settings.max_database_bytes)
-    initialize_sqlite_file(engine, settings.database_path)
-    factory = make_session_factory(engine)
-    recovered = reconcile_interrupted_jobs(factory)
-    engine.dispose()
+    try:
+        initialize_sqlite_file(engine, settings.database_path)
+        verify_sqlite_integrity(engine)
+        apply_migrations(engine, MIGRATIONS_DIR)
+        verify_sqlite_integrity(engine)
+        factory = make_session_factory(engine)
+        recovered = reconcile_interrupted_jobs(factory)
+    finally:
+        engine.dispose()
     if recovered:
         logging.getLogger("pocketcloud.lifecycle").warning(
             "interrupted_jobs_quarantined", extra={"diagnostic_code": str(recovered)}
