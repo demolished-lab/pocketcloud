@@ -13,7 +13,7 @@ Assets include device private keys/trust records, authorization and revocation s
 - **Malicious/malformed payload:** strict handler allowlist, schema validation, payload/output limits, timeouts, path validation, restricted environment, and process-tree control where feasible.
 - **Secret leakage:** protect private keys using native/OS facilities when available; never hard-code keys; redact credentials, tokens, auth headers, cookies, and recovery codes from logs/exports.
 - **Network interception/discovery spoofing:** authenticated encrypted sessions and pinned device identity; mDNS/NSD does not create trust; no public admin port by default.
-- **Database/storage failure:** transactions, integrity checks, quotas, reserved recovery space, backups and tested restore. Never silently delete active task state.
+- **Database/storage failure:** Stage 1 adds transactions, migrations, a single-process lock, private-home/permission checks, a DB-size cap and reserved free-space admission; backup/restore and corruption/failure injection remain unverified. Reject new work under pressure; never silently delete active task state. The operator must use local app-private storage because arbitrary filesystem/mount detection is not reliable.
 - **Resource abuse/user disruption:** conservative configurable admission; optional work yields under critical device conditions; no hidden wake lock or sleep prevention.
 
 ## Explicit limitations

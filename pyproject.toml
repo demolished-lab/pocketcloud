@@ -1,0 +1,15 @@
+[project]
+name = "pocketcloud-runtime"
+version = "0.1.0"
+description = "Rootless local runtime foundation for PocketCloud"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn==0.54.0",
+  "SQLAlchemy==2.1.6",
+  "alembic==1.20.1",
+]
+
+[tool.pocketcloud]
+# Full resolved pins for the current Linux CPython 3.12 host are in requirements.lock.
+# Target Android/Termux wheel/build compatibility remains to be demonstrated.

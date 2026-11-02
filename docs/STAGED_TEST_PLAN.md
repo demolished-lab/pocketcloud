@@ -1,14 +1,14 @@
 # Staged Validation Plan
 
-No implementation tests have been run; this plan records future evidence requirements. A command that merely starts a process, a screenshot, or a placeholder response does not prove a product capability.
+Host implementation tests have been run for the Stage 1 runtime; see `docs/TEST_REPORT.md` for exact commands/results. This plan records remaining stage gates. A command that merely starts a process, a screenshot, or a placeholder response does not prove a product capability.
 
 ## Stage gates
 
 0. **Feasibility:** record actual phone/laptop OS, hardware, restrictions, dependency choices, unknowns, and threat boundaries. Gate: facts and unknowns documented.
-1. **Rootless runtime:** start backend without root in the intended Termux setup; verify config/logs, live/readiness distinction, a process test, and durable SQLite/job state across restart. Gate: rootless execution and durable state.
+1. **Rootless runtime:** Linux host checks verify non-root refusal, private-home directory/modes, exclusive process ownership, storage admission, live/readiness distinction, a process test, and durable SQLite/job state across restart. Still required on target: install/start from actual Termux and verify Android storage/build compatibility. Gate: target rootless execution and durable state.
 2. **Android supervisor:** verify notification, correct service declaration, Termux bridge permissions, stop path, and real-device matrix: locked/off screen, background, battery saver, Doze, network transition, low battery, thermal warning, memory pressure, process death, reboot, update, force-stop and manual restart. Gate: results documented; force-stop limitation is honest.
 3. **Resource protection:** inject/observe battery/thermal/memory signal availability and provenance; verify optional work yields safely, explains pause, and resumes only after hysteresis/dwell policy. Gate: no oscillation or user-impacting work.
-4. **Cloud core/storage:** state transition, migrations, quotas, backup and actual restore, low-storage rejection, process recovery and failure injection. Gate: recovery evidence and no silent active-state loss.
+4. **Cloud core/storage:** Stage 1 now verifies migrations, transitions, database/free-space admission and process recovery on the Linux host. Still required: backup/actual restore, corruption and disk-full failure injection, retention policy and target-device recovery. Gate: recovery evidence and no silent active-state loss.
 5. **Secure pairing:** short-lived single-use QR, explicit identity confirmation, mutual authentication/encryption, unauthorized/replay rejection, revocation, rotation and audit. Gate: same-LAN pairing security tests pass.
 6. **Windows worker:** runtime OS/Python/GPU/driver/CUDA/available resource/sleep capability probes, approved-handler dispatch, timeout, result persistence and graceful shutdown. Gate: actual reported capabilities match the machine.
 7. **Distributed execution:** disconnect/reconnect, worker restart, lease expiry, stale epochs, at-least-once retry, idempotent duplicate protection, result buffer and ambiguous-outcome quarantine. Gate: interruption matrix passes.

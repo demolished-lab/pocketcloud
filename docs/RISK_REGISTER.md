@@ -11,8 +11,8 @@
 | Duplicate execution or stale lease | Critical | Idempotency/dedupe, lease epochs/fencing, bounded retry and needs_reconciliation on ambiguity | Planned |
 | Arbitrary code execution | Critical | Approved handler registry only; no generic shell or arbitrary code endpoint | Design constraint |
 | LAN-only remote reachability limits | High | Direct LAN first, optional VPN/relay adapter, offline buffer; honest UX about CGNAT/router limitations | Accepted limitation |
-| SQLite corruption/busy/storage exhaustion | High | Single-writer per-device DB, transactions, migrations, quotas, recovery reserve, backup and demonstrated restore | Planned |
-| Dependency drift/supply-chain issue | High | Version pins, license and maintenance review, hash/lock file, update/rollback procedure | Open: exact versions deferred |
+| SQLite corruption/busy/storage exhaustion | High | Single-writer per-device DB, transactions, migrations, database-size cap, reserved free space; add backup and demonstrated restore | Partial: Stage 1 admission/locking tested; backup/restore open |
+| Dependency drift/supply-chain issue | High | Exact version pins, license review and lock; add hashes, update/rollback procedure and platform-specific install tests | Partial: Linux lock completed; hashes, rollback and Android build open |
 | Scope creep into advanced agents/cloud | High | Stage gates and MVP exclusions; no broad build before Stage 1 plan approval | Controlled |
 
 Severity and mitigations are initial engineering judgments from the supplied brief, not measured incident probabilities. Reassess after device audits and threat testing.

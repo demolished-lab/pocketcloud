@@ -1,45 +1,39 @@
 # Stage 1 — Rootless Runtime Plan
 
-**Status: Proposed; implementation is paused until approved.** This is the first implementation stage only, not a claim that the complete platform can be built or verified in this session.
+**Status:** Approved by the user in chat on 2026-11-02 with “continue”; the host implementation passes ten integration tests. The Stage 1 release gate remains open because no target Android/Termux device is attached. This is the first implementation stage only, not the complete platform.
 
 ## Outcome
 
-Establish a minimal Python runtime that can run rootlessly in the intended Termux environment, owns local durable state, exposes accurate liveness/readiness, and can execute a deliberately harmless registered test handler with persisted job state. The Stage 1 gate is not passed until this behavior is demonstrated on the actual supported phone/Termux combination. A desktop-only test is useful but not a substitute.
+Establish a minimal Python runtime that can run rootlessly in the intended Termux environment, owns local durable state, exposes accurate liveness/readiness, and can execute a deliberately harmless registered test handler with persisted job state. The gate is not passed until this behavior is demonstrated on the actual supported phone/Termux combination. Desktop-only testing is useful but not a substitute.
 
-## Design and interfaces
+## Implemented scope
 
-- `runtime/pocketcloud/config`: validated local configuration, with conservative configurable defaults and no hard-coded universal battery/CPU/RAM promises.
-- `runtime/pocketcloud/storage`: SQLite database owned only by this device, transactions, foreign keys, busy timeout, and startup schema migrations.
-- `runtime/pocketcloud/jobs`: small durable state machine for local registered handlers, including unique job ID, idempotency key, attempt count, timestamps, and explicit terminal/error states.
-- `runtime/pocketcloud/compute`: allowlisted handler registry and bounded process lifecycle; no user-provided shell string and no arbitrary code endpoint.
-- `runtime/pocketcloud/api`: local health, readiness, diagnostics, and a narrow job submission/status API. Bind to loopback by default; do not expose a public admin port.
-- `scripts/termux`: documented rootless setup and controlled start/stop commands. Keep the Termux RUN_COMMAND integration decision open until its permissions and target-device behavior are verified.
+The Stage 1 code is laid out as `runtime/pocketcloud/{api.py,config.py,db.py,models.py,jobs.py,handlers.py,storage.py,logging_setup.py}` with Alembic migrations in `runtime/pocketcloud/migrations/`, a manual Termux launcher in `scripts/termux/`, and host integration tests in `tests/`. It includes a loopback-only API, live/readiness endpoints, SQLite migrations and transactions, foreign keys, busy timeout, WAL and synchronous FULL, a durable job/event state machine, strict payload validation and an 8 KiB body cap, one deterministic approved handler, idempotency protection, bounded structured logs, and startup quarantine for unfinished jobs.
 
-Use a Python package layout, `pyproject.toml` with exact dependency pins and a generated lockfile, tests, and operator documentation. Stage 1 should avoid dashboard, pairing, remote networking, background-service claims, arbitrary workload containers, Windows execution, and optional AI/agent features.
+Runtime startup refuses UID 0, restricts state to the current user's home, verifies private ownership/modes, and acquires an exclusive per-data-directory lock before migrations/recovery. Job admission and this bounded handler's state transitions are serialized. Configurable admission defaults are a 64 MiB SQLite page/database ceiling and an 8 MiB minimum free-space threshold; database/WAL/SHM preflight rejects new work before persistence when checks fail. No automatic pruning/deletion occurs. Free-space checks are point-in-time, and underlying filesystem types are not reliably detected; use local app-private Termux storage.
 
-## Proposed dependencies
+It excludes the native Android supervisor, foreground service, Termux `RUN_COMMAND` integration, resource manager, pairing, remote/LAN networking, Windows execution, dashboard, and agents. Those are later stages with separate gates.
 
-FastAPI, Uvicorn, SQLAlchemy, Alembic, and Pydantic are the candidate application dependencies. Before adding them, record their exact versions, licenses, maintenance status, Python compatibility, dependency footprint, and whether installation can be performed offline from a saved wheel set. Prefer maintained compatible versions; pin them. Python's standard library should be used for logging, path handling, subprocess invocation, and SQLite administration where it does not conflict with the approved SQLAlchemy/Alembic storage design.
+## Dependency record
 
-## Review decisions required before implementation
-
-1. Approve this limited Stage 1 scope and its device-based exit gate.
-2. Confirm the target Android model/version and that Termux may be installed from a compatible trusted distribution.
-3. Choose whether the repo should carry an explicit open-source license; it is currently unlicensed despite being public.
-4. Confirm whether the Windows laptop is available later; Windows worker work remains out of Stage 1.
+Direct pins are FastAPI 0.162.0, Uvicorn 0.54.0, SQLAlchemy 2.1.6 and Alembic 1.20.1. Package metadata and rationale are in `docs/TRD.md`; the resolved Linux CPython 3.12 lock is `requirements.lock`. Python 3.11 or later is the declared floor. Termux wheel/native-build compatibility is unverified.
 
 ## Stage 1 gate
 
-The gate requires a reproducible setup on the target phone without root; the backend starts using the intended rootless runtime; health and readiness accurately reflect service state; a registered safe job survives a process restart; migrations and SQLite durability behavior are evidenced; and failures have useful diagnostic context. If direct device access remains unavailable, the code may be authored and host-tested only after approval, but the gate must remain marked **not proven on target hardware**.
+The gate requires reproducible setup on the target phone without root; the backend starts in the intended rootless runtime; health/readiness reflect service state; a registered safe job survives process restart; migrations and SQLite durability behavior are evidenced; and failures have useful diagnostic context. Host tests establish only Linux sandbox behavior. If device access remains unavailable, the gate must stay **not proven on target hardware**.
 
-## Project structure proposal
+## Project structure
 
 ```text
-runtime/pocketcloud/{api,compute,config,jobs,storage}/
-scripts/termux/
-tests/{unit,integration}/
-docs/
+runtime/pocketcloud/
+  api.py config.py db.py models.py jobs.py handlers.py storage.py logging_setup.py
+  migrations/{env.py,versions/}
+scripts/termux/{run.sh,README.md}
+tests/test_runtime.py
+docs/{STAGE_1_PLAN,BUILD_STATUS,TEST_REPORT,TRD}.md
+requirements.in
+requirements.lock
 pyproject.toml
 ```
 
-Add Android Kotlin supervisor, Windows worker, and dashboard directories only when their stages begin and their interfaces have been reviewed. Do not create empty folders to mimic the full reference architecture.
+Add Android Kotlin supervisor, Windows worker, and dashboard code only when those stages begin and their interfaces have been reviewed. Do not create empty folders to mimic the full proposed architecture.
