@@ -15,9 +15,9 @@
 
 ## Verification summary
 
-- Runtime: **20 tests passed** on Linux x86_64 / CPython 3.12.3, in 22.617 seconds.
-- Pairing host: **17 tests passed** on Linux / CPython 3.12, in 0.194 seconds.
-- Existing hosted CI evidence for the repository predates these changes. The new pairing audit tests have not yet been re-run on hosted Windows CI at the time this report was written.
+- Runtime: **20 tests passed** on Linux x86_64 / CPython 3.12.3, in 23.416 seconds.
+- Pairing host: **17 tests passed** on Linux / CPython 3.12, in 0.202 seconds.
+- GitHub Actions run [41487865402](https://github.com/demolished-lab/pocketcloud/actions/runs/41487865402) for commit `1856360` passed all five jobs: runtime Linux, Termux wheel resolution, Android unit tests/debug APK build, pairing-host Linux, and the updated pairing-host Windows suite.
 - Existing project evidence remains relevant but separate: hosted Android compilation/unit tests, Termux package-index wheel resolution, and a 15-minute Linux runtime soak do not prove target-device behavior.
 
 ## Remaining gaps and explicit non-claims

@@ -10,7 +10,7 @@ Command:
 PYTHONPATH=runtime .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Result: **20 tests passed** in 22.617 seconds. Coverage includes liveness/readiness; job persistence and idempotency across restart; changed-payload conflict; interrupted-job quarantine; strict schema, duplicate-key JSON rejection and oversized-body refusal; root, out-of-home and home-itself state-path rejection without permission mutation; single-instance ownership; concurrent capacity admission; 24 parallel identical idempotency submissions producing one persisted job; immutable/checksummed migration replay/tampering rejection; SQLite WAL/foreign-key/busy-timeout/synchronous FULL/page-count; injected page corruption detected by `PRAGMA quick_check`; corrupt database header rejected without changing damaged bytes; fixed supervisor verbs including nonzero outcome and PID-record preservation for an unrelated live PID; and final/parent-symlink, `..` traversal, and PID/temp/log symlink rejection before writing through state paths.
+Result: **20 tests passed** in 23.416 seconds. Coverage includes liveness/readiness; job persistence and idempotency across restart; changed-payload conflict; interrupted-job quarantine; strict schema, duplicate-key JSON rejection and oversized-body refusal; root, out-of-home and home-itself state-path rejection without permission mutation; single-instance ownership; concurrent capacity admission; 24 parallel identical idempotency submissions producing one persisted job; immutable/checksummed migration replay/tampering rejection; SQLite WAL/foreign-key/busy-timeout/synchronous FULL/page-count; injected page corruption detected by `PRAGMA quick_check`; corrupt database header rejected without changing damaged bytes; fixed supervisor verbs including nonzero outcome and PID-record preservation for an unrelated live PID; and final/parent-symlink, `..` traversal, and PID/temp/log symlink rejection before writing through state paths.
 
 Additional checks passed:
 
@@ -28,7 +28,7 @@ Command, after installing the exact pairing lock into a disposable venv:
 python -m unittest discover -s pairing_host/tests -v
 ```
 
-Result: **17 tests passed** in 0.194 seconds on Linux. The previous 16-test baseline passed in hosted Windows CI; the audit-log addition has not yet been rerun on hosted Windows. Coverage includes exact success schema and public-key-only storage; sanitized approval grant/denial audit events, redaction, private file mode and size cap; invalid signatures, curves and DER; expiry; replay; denial consumption; strict/oversized payloads; duplicate JSON keys; concurrent one-use handling; duplicate identity; corrupt-store fail-closed behavior; private/public address policy; exact-interface binding with wildcard rejection; TLS SAN/invitation contract; shared bidi/Unicode-separator rejection; and a slow TLS handshake test proving another request can proceed in a separate bounded worker. The live listener caps eight workers and applies handshake/header/body timeouts. `compileall` and CLI help checks also passed. Hosted Windows CI does not prove behavior on the user's laptop; physical LAN behavior, Android interoperability and security assurance remain open.
+Result: **17 tests passed** in 0.202 seconds on Linux, and the same current suite passed on hosted Windows CI. Coverage includes exact success schema and public-key-only storage; sanitized approval grant/denial audit events, redaction, private file mode and size cap; invalid signatures, curves and DER; expiry; replay; denial consumption; strict/oversized payloads; duplicate JSON keys; concurrent one-use handling; duplicate identity; corrupt-store fail-closed behavior; private/public address policy; exact-interface binding with wildcard rejection; TLS SAN/invitation contract; shared bidi/Unicode-separator rejection; and a slow TLS handshake test proving another request can proceed in a separate bounded worker. The live listener caps eight workers and applies handshake/header/body timeouts. `compileall` and CLI help checks also passed. Hosted Windows CI does not prove behavior on the user's laptop; physical LAN behavior, Android interoperability and security assurance remain open.
 
 ## Android dependency resolution evidence
 
@@ -49,7 +49,7 @@ The Android module contains eight Java/JUnit tests, including bidi/Unicode-name 
 
 ## Hosted CI run
 
-The [GitHub Actions run for commit `280045c`](https://github.com/demolished-lab/pocketcloud/actions/runs/41478156338) passed all five jobs: Linux runtime tests/static checks; Android arm64 CPython 3.12 wheel resolution; Android unit tests plus debug APK assembly/upload; and the pairing-host suite on Linux and hosted Windows. This run predates the current hardening changes; a new run is needed for updated cross-platform evidence. The workflow's green status does not certify target devices.
+The [GitHub Actions run for commit `1856360`](https://github.com/demolished-lab/pocketcloud/actions/runs/41487865402) passed all five jobs: Linux runtime tests/static checks; Android arm64 CPython 3.12 wheel resolution; Android unit tests plus debug APK assembly/upload; and the current pairing-host suite on Linux and hosted Windows. The workflow's green status does not certify target devices.
 
 ## Bounded host soak
 
