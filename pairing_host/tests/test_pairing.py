@@ -11,6 +11,7 @@ import unittest
 import uuid
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
+from unittest.mock import patch
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -117,6 +118,21 @@ class PairingHostTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(set(records[0]), {"phone_id", "public_key_der"})
         self.assertNotIn(self.token, self.store_path.read_text(encoding="utf-8"))
+        audit_path = self.store_path.parent / "pairing-audit.jsonl"
+        audit_text = audit_path.read_text(encoding="utf-8")
+        audit_event = json.loads(audit_text)
+        self.assertEqual(audit_event["event"], "approval_granted")
+        self.assertEqual(audit_event["pairing_id"], self.invitation.pairing_id)
+        self.assertEqual(audit_event["phone_id"], request["phone_id"])
+        self.assertEqual(audit_event["phone_key_sha256"], request["phone_id"])
+        self.assertEqual(
+            set(audit_event),
+            {"timestamp", "event", "pairing_id", "phone_id", "phone_key_sha256"},
+        )
+        self.assertNotIn(self.token, audit_text)
+        self.assertNotIn(request["signature"], audit_text)
+        self.assertNotIn(request["public_key_der"], audit_text)
+        self.assertNotIn("My phone", audit_text)
         self.assertEqual(self.approvals[0][0], "My phone")
 
     def test_invalid_signature_rejected_without_approval(self) -> None:
@@ -125,6 +141,7 @@ class PairingHostTests(unittest.TestCase):
         self.assertEqual((status, response), (400, ERROR_BODY))
         self.assertEqual(self.approvals, [])
         self.assertFalse(self.service.consumed)
+        self.assertFalse((self.store_path.parent / "pairing-audit.jsonl").exists())
 
     def test_invalid_curve_and_malformed_der_rejected(self) -> None:
         non_p256 = ec.generate_private_key(ec.SECP384R1())
@@ -157,6 +174,32 @@ class PairingHostTests(unittest.TestCase):
         self.assertTrue(denied.consumed)
         self.assertEqual(denied.process_body(body), (400, ERROR_BODY))
         self.assertEqual(self.store.records(), [])
+        audit_event = json.loads((self.store_path.parent / "pairing-audit.jsonl").read_text(encoding="utf-8"))
+        request = json.loads(body.decode("utf-8"))
+        self.assertEqual(audit_event["event"], "approval_denied")
+        self.assertEqual(audit_event["phone_id"], request["phone_id"])
+        self.assertNotIn(self.token, json.dumps(audit_event))
+
+    def test_audit_log_is_private_and_bounded(self) -> None:
+        self.store.record_audit_event(
+            "approval_denied",
+            self.invitation.pairing_id,
+            "a" * 64,
+            "a" * 64,
+        )
+        audit_path = self.store_path.parent / "pairing-audit.jsonl"
+        initial = audit_path.read_bytes()
+        if __import__("os").name != "nt":
+            self.assertEqual(audit_path.stat().st_mode & 0o777, 0o600)
+        with patch("pairing_host.server.MAX_AUDIT_LOG_BYTES", len(initial)):
+            with self.assertRaisesRegex(RuntimeError, "audit log size limit"):
+                self.store.record_audit_event(
+                    "approval_granted",
+                    self.invitation.pairing_id,
+                    "b" * 64,
+                    "b" * 64,
+                )
+        self.assertEqual(audit_path.read_bytes(), initial)
 
     def test_unexpected_fields_and_oversize_payload_rejected(self) -> None:
         request = self._request()

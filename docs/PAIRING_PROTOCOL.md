@@ -69,6 +69,10 @@ Success response:
 
 Errors use a generic `{"error":"pairing_rejected"}` shape to avoid leaking token-verification details. The client stores only the public laptop pin and IDs in app-private preferences; the phone private key remains in Android Keystore.
 
+## Local pairing audit history
+
+The laptop writes `pairing-audit.jsonl` beside its pairing records for cryptographically verified operator decisions only: `approval_granted` or `approval_denied`. Each line contains a UTC timestamp, pairing ID, verified phone ID, and phone-key SHA-256 fingerprint. It does not contain the QR token, signature, public-key bytes, phone display name, source address, or raw request. The file is append-only, capped at 1 MiB, and uses mode `0600` on POSIX; on Windows it inherits the containing directory's user ACL. HTTP access logging remains disabled. A grant is audited before the public-key record is persisted, so audit-write failure prevents that key from being stored. Malformed or unauthenticated requests are intentionally not logged to avoid credential exposure and unauthenticated log-filling.
+
 ## Threat boundaries and future work
 
 This provides a same-LAN bootstrap with server-key pinning, phone proof-of-possession, short-lived replay protection, and explicit consent on both endpoints. Persistent laptop identity/key protection, phone backup/restore behavior, clock skew, LAN address transitions, revocation UI, secure persistent authenticated sessions, worker capability registration, and pairing soak/fuzz/device testing remain open gates. No remote execution or distributed job dispatch is exposed by this protocol.

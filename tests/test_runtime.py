@@ -22,7 +22,7 @@ if RUNTIME_PATH not in sys.path:
     sys.path.insert(0, RUNTIME_PATH)
 
 from pocketcloud.db import create_sqlite_engine
-from pocketcloud.config import load_settings, require_unprivileged
+from pocketcloud.config import load_settings, prepare_data_dir, require_unprivileged
 from pocketcloud.db import initialize_sqlite_file, verify_sqlite_integrity
 from pocketcloud.migrations import apply_migrations
 from pocketcloud.storage import database_bytes
@@ -114,6 +114,19 @@ class RuntimeIntegrationTests(unittest.TestCase):
         with patch.dict(os.environ, {"POCKETCLOUD_DATA_DIR": "/tmp/pocketcloud-external-state"}):
             with self.assertRaisesRegex(PermissionError, "under the current user's home directory"):
                 load_settings()
+
+    def test_home_directory_cannot_be_used_as_runtime_state(self) -> None:
+        mock_home = Path(self.temporary.name) / "mock-home"
+        mock_home.mkdir(mode=0o755)
+        mock_home.chmod(0o755)
+        original_mode = mock_home.stat().st_mode & 0o777
+        with patch("pocketcloud.config.Path.home", return_value=mock_home):
+            with patch.dict(os.environ, {"POCKETCLOUD_DATA_DIR": str(mock_home)}):
+                with self.assertRaisesRegex(PermissionError, "dedicated child directory"):
+                    load_settings()
+                with self.assertRaisesRegex(PermissionError, "dedicated child directory"):
+                    prepare_data_dir(mock_home)
+        self.assertEqual(mock_home.stat().st_mode & 0o777, original_mode)
 
     def test_storage_reserve_rejects_new_jobs_without_dropping_state(self) -> None:
         self._stop_server()
@@ -207,6 +220,31 @@ class RuntimeIntegrationTests(unittest.TestCase):
         for submission in invalid:
             with self.subTest(submission=submission):
                 status, _ = self._post("/v1/jobs", submission)
+                self.assertEqual(status, 422)
+        with sqlite3.connect(self.data_dir / "pocketcloud.sqlite3") as connection:
+            count = connection.execute("SELECT count(*) FROM jobs").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_duplicate_json_keys_are_rejected_without_persistence(self) -> None:
+        documents = (
+            '{"handler_id":"unknown","handler_id":"self_test.v1",'
+            '"idempotency_key":"duplicate:top-level","payload":{"message":"x"}}',
+            '{"handler_id":"self_test.v1","idempotency_key":"duplicate:nested",'
+            '"payload":{"message":"first","message":"second"}}',
+        )
+        for document in documents:
+            with self.subTest(document=document):
+                request = Request(
+                    self.base_url + "/v1/jobs",
+                    data=document.encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    with urlopen(request, timeout=5) as response:
+                        status = response.status
+                except HTTPError as response:
+                    status = response.code
                 self.assertEqual(status, 422)
         with sqlite3.connect(self.data_dir / "pocketcloud.sqlite3") as connection:
             count = connection.execute("SELECT count(*) FROM jobs").fetchone()[0]
@@ -307,6 +345,35 @@ class RuntimeIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(stop.returncode, 0, stop.stderr + stop.stdout)
         self.assertIn("runtime stopped", stop.stdout)
+
+    def test_termux_stop_does_not_report_success_for_unowned_live_pid(self) -> None:
+        self._stop_server()
+        state_dir = Path(self.temporary.name) / "unowned-live-pid-state"
+        state_dir.mkdir(mode=0o700)
+        unrelated = subprocess.Popen(["sleep", "30"])
+        pid_file = state_dir / "runtime.pid"
+        pid_file.write_text(f"{unrelated.pid}\n", encoding="ascii")
+        pid_file.chmod(0o600)
+        env = os.environ.copy()
+        env["PYTHON_BIN"] = sys.executable
+        env["POCKETCLOUD_DATA_DIR"] = str(state_dir)
+        try:
+            result = subprocess.run(
+                ["bash", "scripts/termux/supervisor.sh", "stop"],
+                cwd=REPOSITORY_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("not confirmed as PocketCloud", result.stderr)
+            self.assertIsNone(unrelated.poll(), "the unrelated live process must not be signalled")
+            self.assertEqual(pid_file.read_text(encoding="ascii"), f"{unrelated.pid}\n")
+        finally:
+            if unrelated.poll() is None:
+                unrelated.terminate()
+                unrelated.wait(timeout=5)
 
     def test_termux_supervisor_rejects_symlink_and_traversal_before_mutation(self) -> None:
         self._stop_server()

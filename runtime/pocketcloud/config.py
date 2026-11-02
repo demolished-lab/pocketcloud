@@ -42,6 +42,8 @@ def _positive_int(name: str, default: int, *, allow_zero: bool = False) -> int:
 def _private_home_path(path: Path) -> Path:
     resolved = path.expanduser().resolve()
     home = Path.home().resolve()
+    if resolved == home:
+        raise PermissionError("PocketCloud state must use a dedicated child directory under the user's home")
     try:
         resolved.relative_to(home)
     except ValueError as exc:

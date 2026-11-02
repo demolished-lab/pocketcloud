@@ -22,4 +22,6 @@ The MVP does not claim VM isolation, root-level process containment, protection 
 
 ## Audit events
 
-Record pairing approval/denial, key changes, revocation, privileged action, dispatch/lease transitions, result receipt, resource policy change, and reconciliation decisions. Audit records must be bounded and sanitized. Exports must state signal provenance and omit secrets/personal data.
+The pairing host currently records cryptographically verified operator approval grants and denials in a sanitized, append-only JSONL file capped at 1 MiB. Each record includes a timestamp, pairing ID, verified phone ID and key fingerprint; it omits tokens, signatures, public-key bytes, phone labels and source addresses. Malformed or unauthenticated requests are not recorded. HTTP access logging remains disabled. The 1 MiB cap, private POSIX mode, Windows inherited ACL and fail-closed grant path have host tests.
+
+The broader audit requirement remains open: key changes, revocation, privileged actions, dispatch/lease transitions, result receipt, resource policy changes and reconciliation decisions do not yet exist or have audit events. Future audit records must remain bounded and sanitized; exports must state signal provenance and omit secrets/personal data.

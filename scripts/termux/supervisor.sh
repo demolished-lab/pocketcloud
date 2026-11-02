@@ -131,6 +131,9 @@ stop_runtime() {
     exit 0
   fi
   if ! runtime_matches_pid "$pid"; then
+    if kill -0 "$pid" 2>/dev/null; then
+      fail "PID $pid is alive but not confirmed as PocketCloud; refusing to signal or remove its record"
+    fi
     rm -f "$PID_FILE"
     printf 'Removed a stale PocketCloud PID record; no process was signalled.\n'
     exit 0

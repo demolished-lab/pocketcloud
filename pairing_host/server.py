@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Any
@@ -33,6 +34,7 @@ from .protocol import (
 
 ERROR_BODY = {"error": "pairing_rejected"}
 PHONE_ID_RE = re.compile(r"^[0-9a-f]{64}$")
+MAX_AUDIT_LOG_BYTES = 1024 * 1024
 
 
 class BoundedThreadingHTTPServer(ThreadingHTTPServer):
@@ -96,6 +98,7 @@ class PairingStore:
     def __init__(self, path: str | os.PathLike[str]) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.audit_path = self.path.parent / "pairing-audit.jsonl"
         try:
             os.chmod(self.path.parent, 0o700)
         except OSError:
@@ -163,6 +166,54 @@ class PairingStore:
     def records(self) -> list[dict[str, str]]:
         with self._lock:
             return list(self._read())
+
+    def record_audit_event(
+        self,
+        event: str,
+        pairing_id: str,
+        phone_id: str,
+        phone_key_sha256: str,
+    ) -> None:
+        """Append a verified operator decision, excluding request secrets and personal labels."""
+        if event not in {"approval_granted", "approval_denied"}:
+            raise ValueError("unsupported pairing audit event")
+        if not PHONE_ID_RE.fullmatch(phone_id) or not PHONE_ID_RE.fullmatch(phone_key_sha256):
+            raise ValueError("invalid phone identity in pairing audit event")
+        try:
+            if str(uuid.UUID(pairing_id)) != pairing_id:
+                raise ValueError("invalid pairing ID in audit event")
+        except ValueError as exc:
+            raise ValueError("invalid pairing ID in audit event") from exc
+
+        event_record = {
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "event": event,
+            "pairing_id": pairing_id,
+            "phone_id": phone_id,
+            "phone_key_sha256": phone_key_sha256,
+        }
+        payload = (json.dumps(event_record, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        with self._lock:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            try:
+                fd = os.open(self.audit_path, flags, 0o600)
+            except OSError as exc:
+                raise RuntimeError("could not open pairing audit log") from exc
+            try:
+                if os.name != "nt" and hasattr(os, "fchmod"):
+                    os.fchmod(fd, 0o600)
+                if os.fstat(fd).st_size + len(payload) > MAX_AUDIT_LOG_BYTES:
+                    raise RuntimeError("pairing audit log size limit reached")
+                written = os.write(fd, payload)
+                if written != len(payload):
+                    raise RuntimeError("incomplete pairing audit log write")
+                os.fsync(fd)
+            except OSError as exc:
+                raise RuntimeError("could not persist pairing audit event") from exc
+            finally:
+                os.close(fd)
 
 
 class PairingService:
@@ -261,7 +312,11 @@ class PairingService:
 
             approved = self.approve(phone_name, phone_id, key_sha256)
             if approved is not True:
+                self.store.record_audit_event(
+                    "approval_denied", pairing_id, phone_id, key_sha256
+                )
                 raise PairingRejected
+            self.store.record_audit_event("approval_granted", pairing_id, phone_id, key_sha256)
             self.store.add(phone_id, public_key_der)
             return 200, {
                 "paired": True,

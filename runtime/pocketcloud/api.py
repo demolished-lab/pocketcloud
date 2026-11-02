@@ -26,6 +26,19 @@ MAX_REQUEST_BYTES = 8 * 1024
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
+class DuplicateJSONKeyError(ValueError):
+    pass
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise DuplicateJSONKeyError("duplicate_json_key")
+        value[key] = item
+    return value
+
+
 class MaxBodyBytesMiddleware:
     """Buffer only small local API bodies and reject larger requests with 413."""
 
@@ -127,8 +140,8 @@ def create_app(
         if content_type != "application/json":
             return _error(415, "content_type_must_be_application_json")
         try:
-            value = json.loads(await request.body())
-        except (json.JSONDecodeError, UnicodeDecodeError):
+            value = json.loads(await request.body(), object_pairs_hook=_unique_json_object)
+        except (json.JSONDecodeError, UnicodeDecodeError, DuplicateJSONKeyError):
             return _error(422, "invalid_json")
         parsed = _parse_submission(value)
         if isinstance(parsed, str):
