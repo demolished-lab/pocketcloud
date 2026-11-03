@@ -1,6 +1,6 @@
 # Stage 2 — Platform Research and Evidence
 
-**Research date:** 2026-11-02. **Scope:** Android supervisor and same-LAN phone-to-laptop pairing foundation. The phone and Windows laptop are not attached, so all target-device behavior remains unverified.
+**Research date:** 2026-11-02, with CI evidence refreshed 2026-11-03. **Scope:** Android supervisor and same-LAN phone-to-laptop pairing foundation. The phone and Windows laptop are not attached, so all target-device behavior remains unverified.
 
 ## Findings that affect implementation
 
@@ -10,12 +10,12 @@ Termux's documented `RUN_COMMAND` boundary requires the caller to declare `com.t
 
 The old FastAPI 0.162.0 path depended on Pydantic Core 2.50.2. PyPI's release files and a binary-only Android arm64 CPython 3.12 resolution both showed that release had no matching Android wheel. To remove that native/Rust wheel dependency, the local API was changed to Starlette with explicit strict request validation; Alembic/Mako was replaced by checksummed SQL migration files. The resulting dependency set contains only pure-Python wheels in the tested resolution. A `pip download --only-binary=:all:` resolution for `android_24_arm64_v8a`, CPython 3.12 succeeded for all eight locked packages. This is package-index evidence only: Termux's installed Python version/tags, actual install, filesystem permissions, Android lifecycle and device power behavior still require a real phone.
 
-Android Keystore will hold a non-exportable P-256 signing key for phone identity. Pairing uses an expiring one-use QR invitation, TLS with the laptop public-key pin from the invitation, a phone-signed challenge transcript, and explicit approval on both devices. No arbitrary shell or job-dispatch capability is added by pairing. Pairing/revocation and later job protocols are separate from the supervisor's local Termux control.
+Android Keystore holds a non-exportable P-256 signing key for phone identity. Pairing uses an expiring one-use QR invitation, TLS with the laptop public-key pin from the invitation, a phone-signed challenge transcript, and explicit approval on both devices. No arbitrary shell or job-dispatch capability is added by pairing. Pairing/revocation and later job protocols are separate from the supervisor's local Termux control.
 
 ## Evidence not available here
 
-- No Android SDK/`ANDROID_HOME`, `javac`, ADB, emulator, Android phone, Termux installation, Windows laptop, or Windows shell is available in this sandbox. The local Gradle 8.13 invocation stops before compilation because the SDK is missing.
-- The hosted GitHub Actions run on commit `280045c` passed Android unit tests and `assembleDebug`, and uploaded a debug APK. No local APK build, emulator run, or physical-device installation has been performed.
+- No Android SDK/`ANDROID_HOME`, `javac`, ADB, emulator, Android phone, Termux installation, Windows laptop, or Windows shell is available in this sandbox. Local Gradle execution stops before compilation because the SDK is missing.
+- GitHub Actions run [41487865402](https://github.com/demolished-lab/pocketcloud/actions/runs/41487865402) on the hardening code commit `1856360` passed all five jobs, including the Android unit tests/build and hosted Windows pairing tests. Follow-up documentation run [41488618579](https://github.com/demolished-lab/pocketcloud/actions/runs/41488618579) on `91cb41f` also passed all five jobs. These runs predate the workflow action/runner pin update; that update must get its own CI evidence.
 - Android service survival across screen-off, Doze, process death, OEM battery management, reboot, notification denial, and Termux configuration failure is untested.
 - Pairing-host tests passed on a hosted Windows runner; that is not evidence from the specified laptop.
 - A 15-minute Linux host soak passed with 180 checks and zero failures. No security assessment, 1/6/12/24-hour soak, filesystem-specific crash test, or full power-loss test is claimed.
