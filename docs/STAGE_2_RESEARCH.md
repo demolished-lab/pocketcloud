@@ -15,7 +15,8 @@ Android Keystore holds a non-exportable P-256 signing key for phone identity. Pa
 ## Evidence not available here
 
 - No Android SDK/`ANDROID_HOME`, `javac`, ADB, emulator, Android phone, Termux installation, Windows laptop, or Windows shell is available in this sandbox. Local Gradle execution stops before compilation because the SDK is missing.
-- GitHub Actions run [41487865402](https://github.com/demolished-lab/pocketcloud/actions/runs/41487865402) on the hardening code commit `1856360` passed all five jobs, including the Android unit tests/build and hosted Windows pairing tests. Follow-up documentation run [41488618579](https://github.com/demolished-lab/pocketcloud/actions/runs/41488618579) on `91cb41f` also passed all five jobs. These runs predate the workflow action/runner pin update; that update must get its own CI evidence.
+- The latest pinned-workflow GitHub Actions run [41660601371](https://github.com/demolished-lab/pocketcloud/actions/runs/41660601371) on commit `a67f02a` passed all five jobs, including runtime tests, Termux wheel resolution, Android unit tests/build/APK upload, and pairing-host tests on Linux and hosted Windows 2025. This is hosted CI evidence, not target-device verification.
+- Earlier all-green evidence remains available: hardening-code run [41487865402](https://github.com/demolished-lab/pocketcloud/actions/runs/41487865402) on `1856360` and documentation-only run [41488618579](https://github.com/demolished-lab/pocketcloud/actions/runs/41488618579) on `91cb41f`.
 - Android service survival across screen-off, Doze, process death, OEM battery management, reboot, notification denial, and Termux configuration failure is untested.
 - Pairing-host tests passed on a hosted Windows runner; that is not evidence from the specified laptop.
 - A 15-minute Linux host soak passed with 180 checks and zero failures. No security assessment, 1/6/12/24-hour soak, filesystem-specific crash test, or full power-loss test is claimed.

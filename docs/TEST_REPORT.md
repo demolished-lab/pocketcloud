@@ -60,3 +60,9 @@ The [GitHub Actions run for commit `1856360`](https://github.com/demolished-lab/
 The suites demonstrate Linux sandbox behavior with fresh dependency environments. They do not establish Termux installation, Android foreground-service eligibility, notifications, Doze/background behavior, OEM battery restrictions, Android process death/reboot recovery, or actual `RUN_COMMAND` behavior. The supervisor script test invokes the Termux-facing shell locally on Linux and is not a phone test.
 
 No Windows laptop, GPU driver, CUDA, sleep-state, or actual-laptop validation was performed. Hosted Windows pairing tests passed but do not prove the user's laptop. Phone-to-laptop pairing requires same-LAN physical-device validation and independent security review. Backup/restore, power-loss recovery, revocation/rotation, filesystem-specific crash tests and longer soaks remain open. The free-space check is point-in-time; no automatic retention/pruning is implemented.
+
+## Follow-up verification — 2026-11-03
+
+The final local runtime suite passed **20 tests** in 23.808 seconds, and the pairing-host suite passed **17 tests** in 0.200 seconds. Python compile checks, Termux shell syntax, workflow/Dependabot YAML parsing, action SHA-format validation, and `git diff --check` also passed. The YAML parser was installed only in a disposable `/tmp` location; no project dependency was added.
+
+The updated workflow uses official actions pinned by full commit SHA, with release-version comments, and fixed runner labels `ubuntu-24.04` and `windows-2025`. The first hosted run after that change, [run 41660601371](https://github.com/demolished-lab/pocketcloud/actions/runs/41660601371) on commit `a67f02a`, passed all five jobs: runtime Linux, Termux wheel resolution, Android unit tests/build and APK upload, pairing-host Linux, and pairing-host Windows. This remains hosted CI evidence only; no Android phone or target Windows laptop was tested.
