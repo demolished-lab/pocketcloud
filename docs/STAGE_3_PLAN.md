@@ -36,7 +36,7 @@ Stage 3 exits only when an actual optional workload pauses safely under observed
 
 ## Inputs required before implementation
 
-The next device audit needs the phone manufacturer/model, Android version/API level, Termux distribution/version, and confirmation that the device may be used for controlled lifecycle/resource tests. Preserve the Windows laptop as a separate later-stage target; hosted Windows CI is not its substitute.
+The next device audit should first capture a read-only profile with `python3 scripts/testing/target_preflight.py` on a host with caller-installed Android platform-tools. The collector requires one authorized device (or explicit `--serial`), writes no data to the phone, omits the serial from reports, and labels inventory separately from validation. It does not verify `RUN_COMMAND`, permissions, OEM lifecycle, or resource signals. The actual phone manufacturer/model, Android version/API, Termux distribution/version, and user authorization for controlled lifecycle/resource tests are still required. Preserve the Windows laptop as a separate later-stage target; hosted Windows CI is not its substitute.
 
 ## References
 

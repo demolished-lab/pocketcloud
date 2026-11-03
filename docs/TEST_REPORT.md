@@ -7,7 +7,7 @@
 Command:
 
 ```sh
-PYTHONPATH=runtime .venv/bin/python -m unittest discover -s tests -v
+PYTHONPATH=runtime .venv/bin/python -m unittest discover -s tests -p 'test_runtime.py' -v
 ```
 
 Result: **20 tests passed** in 23.416 seconds. Coverage includes liveness/readiness; job persistence and idempotency across restart; changed-payload conflict; interrupted-job quarantine; strict schema, duplicate-key JSON rejection and oversized-body refusal; root, out-of-home and home-itself state-path rejection without permission mutation; single-instance ownership; concurrent capacity admission; 24 parallel identical idempotency submissions producing one persisted job; immutable/checksummed migration replay/tampering rejection; SQLite WAL/foreign-key/busy-timeout/synchronous FULL/page-count; injected page corruption detected by `PRAGMA quick_check`; corrupt database header rejected without changing damaged bytes; fixed supervisor verbs including nonzero outcome and PID-record preservation for an unrelated live PID; and final/parent-symlink, `..` traversal, and PID/temp/log symlink rejection before writing through state paths.
@@ -43,6 +43,17 @@ python -m pip download --dest /tmp/pocketcloud-termux-wheelhouse \
 
 The selected set includes Starlette 1.10.0, Uvicorn 0.54.0, SQLAlchemy 2.1.6 and five support packages. This remains package-index evidence only; it does **not** prove actual Termux Python tags, installation, Android filesystem permissions, service behavior, or device power characteristics.
 
+## Read-only target inventory preflight
+
+The new `scripts/testing/target_preflight.py` collector has **eight mocked-ADB unit tests**. They cover one-device selection, ambiguity refusal, explicit selection with serial redaction, bounded fixed-command inventory, missing Termux reporting, emulator-property caveats, oversized output rejection, unauthorized-device refusal, and exclusive private/no-overwrite report creation. The command can be checked from the repository root with:
+
+```sh
+PYTHONPATH=runtime .venv/bin/python -m unittest discover -s tests -p 'test_target_preflight.py' -v
+python3 scripts/testing/target_preflight.py --help
+```
+
+Tests use synthetic ADB responses and do not query or mutate a device. The collector reads only an allowlist of properties plus `/proc/meminfo`, `/data` free space, and the Termux package version. It does not install or launch apps, change settings, stop processes, or invoke root. Its report has `gate_status: not_evaluated`; a complete inventory is not a test pass. See `docs/HARDWARE_SUPPORT_MODEL.md` for the explicit mocks/virtual devices/physical-device evidence levels and the optional development-only REA boundary.
+
 ## Android source build attempt
 
 The Android module contains eight Java/JUnit tests, including bidi/Unicode-name rejection and canonical base64url vectors. Local command `./gradlew --no-daemon testDebugUnitTest` was attempted. Gradle stopped before test execution or source compilation with `SDK location not found`; neither `ANDROID_HOME` nor `ANDROID_SDK_ROOT` is configured, no Android SDK is installed, and the sandbox has a Java runtime but no `javac`. The later hosted GitHub Actions run passed `testDebugUnitTest` and `assembleDebug` and uploaded the debug APK. The 365,215-byte downloaded APK passed ZIP integrity validation; SHA-256: `04af6e3e96722c1520d299c855ea800a15da2184dd2792ce0b7021b835d19a7a`. This establishes hosted compilation/unit-test/package evidence only, not emulator or phone installation/behavior.
@@ -63,6 +74,6 @@ No Windows laptop, GPU driver, CUDA, sleep-state, or actual-laptop validation wa
 
 ## Follow-up verification — 2026-11-03
 
-The final local runtime suite passed **20 tests** in 23.808 seconds, and the pairing-host suite passed **17 tests** in 0.200 seconds. Python compile checks, Termux shell syntax, workflow/Dependabot YAML parsing, action SHA-format validation, and `git diff --check` also passed. The YAML parser was installed only in a disposable `/tmp` location; no project dependency was added.
+The final full local runtime-plus-preflight discovery passed **28 tests** in 22.077 seconds: 20 runtime integration tests and eight mocked ADB preflight tests. The pairing-host suite passed **17 tests** in 0.194 seconds. Python compile checks, preflight CLI help/missing-ADB behavior, Termux shell syntax, workflow/Dependabot YAML parsing, action SHA-format validation, and `git diff --check` also passed. The YAML parser was installed only in a disposable `/tmp` location; no project dependency was added.
 
-The updated workflow uses official actions pinned by full commit SHA, with release-version comments, and fixed runner labels `ubuntu-24.04` and `windows-2025`. The first hosted run after that change, [run 41660601371](https://github.com/demolished-lab/pocketcloud/actions/runs/41660601371) on commit `a67f02a`, passed all five jobs: runtime Linux, Termux wheel resolution, Android unit tests/build and APK upload, pairing-host Linux, and pairing-host Windows. This remains hosted CI evidence only; no Android phone or target Windows laptop was tested.
+The updated workflow uses official actions pinned by full commit SHA, with release-version comments, and fixed runner labels `ubuntu-24.04` and `windows-2025`. The pinned workflow passed on [run 41661568595](https://github.com/demolished-lab/pocketcloud/actions/runs/41661568595) on commit `87dd284`. That run predates the new preflight test/compile steps; a new hosted run is required. The new preflight test is configured to run on both Linux and hosted Windows. Hosted CI remains software evidence only; no Android phone or target Windows laptop was tested.

@@ -6,7 +6,7 @@
 
 The supplied brief identifies the intended laptop as Windows 11 with Ryzen 5 7535HS, 16 GB RAM, and an NVIDIA RTX 3050 Laptop GPU with 6 GB VRAM. These are user-provided target specifications, not measurements made by this session. The brief does not identify the Android make/model, Android version/API, memory, storage, battery capacity, chipset, or OEM restrictions.
 
-The execution environment inspected for this task is Linux x86_64, Python 3.12.3, Node.js 22.23.4, and GitHub CLI. `adb` is unavailable; Java exists, but Gradle and `sdkmanager` are unavailable. There is no attached Android device, Windows host, or PowerShell bridge. Therefore no phone property, Windows driver/CUDA state, GPU compatibility, disk capacity, sleep behavior, or real-device lifecycle result can be verified here.
+The execution environment inspected for this task is Linux x86_64, Python 3.12.3, Node.js 22.23.4, and GitHub CLI. `adb` is unavailable; Java exists, but Gradle and `sdkmanager` are unavailable. There is no attached Android device, Windows host, or PowerShell bridge. Therefore no phone property, Windows driver/CUDA state, GPU compatibility, disk capacity, sleep behavior, or real-device lifecycle result can be verified here. A read-only ADB preflight collector is now available at `scripts/testing/target_preflight.py`; its eight tests use mocked ADB responses, so it has collected no actual phone facts.
 
 ## Platform feasibility findings
 
@@ -26,12 +26,13 @@ The initial Stage 1 proposal below was superseded after Android wheel-resolution
 - Android/Termux platform constraints: initial official-source review completed; target-version compatibility remains open.
 - Threat and architecture boundaries: recorded in companion documents.
 - Phone audit: blocked because no phone is attached and the identifying facts cannot be inferred.
+- Read-only phone preflight: implemented with fixed ADB probes, explicit single-device selection, bounded output, serial redaction, and private no-overwrite report output. It reports inventory completeness separately from test gates; the live-device operation remains unverified.
 - Windows worker audit: blocked because no Windows host is attached; the supplied hardware description is not runtime verification.
 - Stage 1 plan: approved by the user on 2026-11-02; host implementation exists, while its target-device gate remains open.
 
 ## Information needed to complete the device-specific audit
 
-Please provide the Android phone manufacturer/model and Android version (or API level), plus available RAM and free internal storage if visible in Settings. Also provide the Termux distribution/version and confirm whether the specified Windows 11 laptop is physically available for later worker tests. If device access is available through another authorized environment, it can be selected for a direct audit; otherwise these details must come from the user.
+When available, connect and authorize the phone over USB or ADB and run `python3 scripts/testing/target_preflight.py` from a host with Android platform-tools installed. It requires one authorized device, or an explicit `--serial` if several are connected. If no direct access is available, provide the phone manufacturer/model, Android version/API, RAM and free internal storage, Termux distribution/version, and confirm whether the specified Windows 11 laptop is physically available for later worker tests. A preflight inventory does not replace the phone lifecycle tests.
 
 ## References
 
