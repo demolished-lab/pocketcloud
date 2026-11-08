@@ -34,7 +34,18 @@ fi
 
 avd_name="pocketcloud-api${api_level}"
 system_image="system-images;android-${api_level};google_apis;x86_64"
-printf 'no\n' | "$avdmanager_bin" create avd --force --name "$avd_name" --package "$system_image" --device pixel_2
+android_user_home="$HOME/.android"
+export ANDROID_SDK_HOME="$android_user_home"
+export ANDROID_USER_HOME="$android_user_home"
+export ANDROID_AVD_HOME="$android_user_home/avd"
+mkdir -p "$ANDROID_AVD_HOME"
+printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image" -d pixel_2 -p "$ANDROID_AVD_HOME/$avd_name.avd"
+"$avdmanager_bin" list avd
+if [[ ! -f "$ANDROID_AVD_HOME/$avd_name.ini" || ! -f "$ANDROID_AVD_HOME/$avd_name.avd/config.ini" ]]; then
+  echo "avdmanager did not create the expected profile files under $ANDROID_AVD_HOME" >&2
+  find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print >&2 || true
+  exit 1
+fi
 
 log_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 log_file="$log_dir/pocketcloud-emulator-api${api_level}.log"
