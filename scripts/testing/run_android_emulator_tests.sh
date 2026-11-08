@@ -35,12 +35,21 @@ fi
 avd_name="pocketcloud-api${api_level}"
 system_image="system-images;android-${api_level};google_apis;x86_64"
 android_user_home="$HOME/.android"
-export ANDROID_SDK_HOME="$android_user_home"
+unset ANDROID_SDK_HOME
 export ANDROID_USER_HOME="$android_user_home"
 export ANDROID_EMULATOR_HOME="$android_user_home"
 export ANDROID_AVD_HOME="$android_user_home/avd"
 mkdir -p "$ANDROID_AVD_HOME"
-printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image" -d pixel_2
+printf 'Android user home: %s\nAndroid emulator home: %s\nAndroid AVD home: %s\n' \\
+  "$ANDROID_USER_HOME" "$ANDROID_EMULATOR_HOME" "$ANDROID_AVD_HOME"
+if ! printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image"; then
+  echo "AVD creation failed; available hardware profiles:" >&2
+  "$avdmanager_bin" list device -c >&2 || true
+  echo "Existing AVDs:" >&2
+  "$avdmanager_bin" list avd >&2 || true
+  find "$ANDROID_USER_HOME" -maxdepth 4 -iname "*${avd_name}*" -print >&2 || true
+  exit 1
+fi
 "$avdmanager_bin" list avd
 if [[ ! -f "$ANDROID_AVD_HOME/$avd_name.ini" || ! -f "$ANDROID_AVD_HOME/$avd_name.avd/config.ini" ]]; then
   echo "avdmanager did not create the expected profile files under $ANDROID_AVD_HOME" >&2
