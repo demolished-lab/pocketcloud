@@ -40,8 +40,7 @@ export ANDROID_USER_HOME="$android_user_home"
 export ANDROID_EMULATOR_HOME="$android_user_home"
 export ANDROID_AVD_HOME="$android_user_home/avd"
 mkdir -p "$ANDROID_AVD_HOME"
-printf 'Android user home: %s\nAndroid emulator home: %s\nAndroid AVD home: %s\n' \\
-  "$ANDROID_USER_HOME" "$ANDROID_EMULATOR_HOME" "$ANDROID_AVD_HOME"
+printf 'Android user home: %s\nAndroid emulator home: %s\nAndroid AVD home: %s\n' "$ANDROID_USER_HOME" "$ANDROID_EMULATOR_HOME" "$ANDROID_AVD_HOME"
 if ! printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image"; then
   echo "AVD creation failed; available hardware profiles:" >&2
   "$avdmanager_bin" list device -c >&2 || true
