@@ -20,3 +20,8 @@ This document separates source/host checks from target-device evidence. A green 
 ## Evidence records
 
 For each run capture software revision, exact device/OS/build, setup steps, input conditions, timestamps, logs with secrets redacted, actual outcome, deviations, and recovery result. Distinguish sandbox tests, CI, phone and Windows results. Never substitute a planned test or synthetic signal for real-device evidence.
+
+
+## AVD hosted evidence update — 2026-11-08
+
+Run [42483611686](https://github.com/demolished-lab/pocketcloud/actions/runs/42483611686) successfully created and booted API 29 and API 36 AVDs and verified their reported API/emulator identity. Both Gradle jobs then failed because `android.useAndroidX=true` was missing; the project property has been added, and instrumentation must be rerun. This is a specific virtual-device progress point, not a passed instrumentation gate or physical-phone result.

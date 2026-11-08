@@ -33,3 +33,8 @@ The [latest completed GitHub Actions run](https://github.com/demolished-lab/pock
 No Android phone or Windows laptop is attached. APK install, actual Termux permission/service calls, lifecycle/Doze/OEM behavior, same-LAN phone/laptop pairing, Windows laptop operation, backup/restore, revocation/rotation, filesystem-specific failure behavior, independent security review, and 1/6/12/24-hour soaks are incomplete. The Stage 1 and Stage 2 hardware gates remain **not proven on target hardware**. Stage 3 resource protection is preparation-only; see `STAGE_3_PLAN.md`.
 
 The public repository's project license is MIT. `THIRD_PARTY_NOTICES.md` records the current direct and relevant transitive dependency licenses; a complete resolved APK license report is still required before release.
+
+
+## Hosted AVD validation progress — 2026-11-08
+
+Verification-branch run [42483611686](https://github.com/demolished-lab/pocketcloud/actions/runs/42483611686) created and booted both API 29 and API 36 AVDs, then verified their reported API level and emulator property. Both jobs reached Gradle but failed at `:app:checkDebugAndroidTestAarMetadata`: AndroidX test dependencies were present while `android.useAndroidX` was not enabled. `android-supervisor/gradle.properties` now sets `android.useAndroidX=true`; another hosted run must pass before claiming AVD instrumentation evidence. This hosted virtual-device work does not close the real phone or Windows laptop gates.
