@@ -89,6 +89,10 @@ jobs:
           packages: platform-tools
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
+      - name: Install Android Emulator host runtime library
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes libpulse0
       - name: Install Android Emulator, API 36 build tools, and selected system image
         env:
           API_LEVEL: ${{ matrix.api-level }}
