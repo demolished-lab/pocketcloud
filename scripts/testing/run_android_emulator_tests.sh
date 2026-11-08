@@ -37,9 +37,10 @@ system_image="system-images;android-${api_level};google_apis;x86_64"
 android_user_home="$HOME/.android"
 export ANDROID_SDK_HOME="$android_user_home"
 export ANDROID_USER_HOME="$android_user_home"
+export ANDROID_EMULATOR_HOME="$android_user_home"
 export ANDROID_AVD_HOME="$android_user_home/avd"
 mkdir -p "$ANDROID_AVD_HOME"
-printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image" -d pixel_2 -p "$ANDROID_AVD_HOME/$avd_name.avd"
+printf 'no\n' | "$avdmanager_bin" create avd -f -n "$avd_name" -k "$system_image" -d pixel_2
 "$avdmanager_bin" list avd
 if [[ ! -f "$ANDROID_AVD_HOME/$avd_name.ini" || ! -f "$ANDROID_AVD_HOME/$avd_name.avd/config.ini" ]]; then
   echo "avdmanager did not create the expected profile files under $ANDROID_AVD_HOME" >&2
